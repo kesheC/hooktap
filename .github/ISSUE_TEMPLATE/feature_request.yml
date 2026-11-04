@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest a capability, a flag, or a better default for hooktap.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        hooktap deliberately stays small: zero runtime dependencies, one job done well.
+        A request that fits that shape is much more likely to land.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation, not the solution. What are you doing today instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like it to do?
+      description: A command, a flag, or a changed behaviour. Concrete beats abstract.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Other tools, other flags, or working around it in a script.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: What kind of change is this?
+      options:
+        - New command
+        - New flag on an existing command
+        - Changed default behaviour
+        - Better error message or output
+        - Documentation
+        - Something else
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues for the same request.
+          required: true
+        - label: This does not require a new runtime dependency.
+          required: false

@@ -1,0 +1,50 @@
+{
+  "formatVersion": 1,
+  "name": "captures",
+  "captures": [
+    {
+      "method": "POST",
+      "url": "/hook",
+      "headers": {
+        "host": "127.0.0.1:49713",
+        "content-type": "application/json",
+        "x-github-event": "push",
+        "x-hub-signature-256": "sha256=bf9cf1e6445293e5090ad05b4dbcd8465544a4a7abce79c0910c5cad9d86d9f0",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "30"
+      },
+      "body": {
+        "action": "opened",
+        "number": 1
+      },
+      "raw": "{\"action\":\"opened\",\"number\":1}",
+      "receivedAt": "2026-11-04T21:24:41.309Z",
+      "remote": "127.0.0.1"
+    },
+    {
+      "method": "POST",
+      "url": "/hook",
+      "headers": {
+        "host": "127.0.0.1:49713",
+        "content-type": "application/json",
+        "x-hub-signature-256": "sha256=e4a9a8486ed495de6751638dc69003d50db693847117e1f267de413b8e76e7c8",
+        "accept": "*/*",
+        "accept-language": "*",
+        "sec-fetch-mode": "cors",
+        "user-agent": "node",
+        "accept-encoding": "gzip, deflate",
+        "content-length": "25"
+      },
+      "body": {
+        "ref": "refs/heads/main"
+      },
+      "raw": "{\"ref\":\"refs/heads/main\"}",
+      "receivedAt": "2026-11-04T21:24:41.316Z",
+      "remote": "127.0.0.1"
+    }
+  ]
+}

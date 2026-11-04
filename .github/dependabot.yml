@@ -1,0 +1,61 @@
+# Two ecosystems cover everything this repository installs: the workflow
+# actions (pinned to commit shas, so a bump has to move the sha and the
+# version comment together) and the dev toolchain in package-lock.json.
+#
+# The tarball ships zero runtime dependencies, so "npm" here is the build
+# and test toolchain -- which is still the whole supply chain.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "chore"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+    groups:
+      toolchain:
+        patterns:
+          - "*"
+    # The node floor is 20.11 and the CI matrix honors it, so the toolchain
+    # has to run there too. vitest 5 wants ^22.12, and @types/node majors
+    # describe a newer runtime than the one this package promises, so both
+    # stay on the major that matches the floor. Minors and patches still
+    # flow, and security updates are not affected by this list.
+    #
+    # vitest and @vitest/coverage-v8 are one decision, not two: coverage-v8
+    # declares peerDependencies { vitest: "<exact version>" }, so a major bump
+    # of one cannot install without the other. Holding back only vitest let
+    # coverage-v8 move alone and dependabot opened exactly that pull request
+    # the day after coverage-v8 joined the tree -- all six CI legs died on
+    # ERESOLVE, on a pull request that could never have worked. tests/
+    # workflow.test.ts now fails if a pinned pair is not ignored together.
+    #
+    # The pair lifts when vitest 5's engines floor drops to what this package
+    # still promises, or when the floor here rises to ^22.12; whichever comes
+    # first, both lines go together.
+    #
+    # typescript is deliberately not on this list. It was, until typescript 7
+    # stopped pulling @types/node in on its own and the fix turned out to be
+    # one line in tsconfig (types: ["node"]) rather than a held-back major.
+    # An ignore that is not written down with the condition that lifts it
+    # silently blocks every upgrade in its range.
+    ignore:
+      - dependency-name: "vitest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitest/coverage-v8"
+        update-types: ["version-update:semver-major"]
+      # Lifts when the matrix gains the node line these types describe.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]

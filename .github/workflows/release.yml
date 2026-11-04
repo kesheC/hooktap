@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      # Gate: the tag must match the package.json version before any gh call.
+      - name: Verify tag matches package version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag $TAG != package.json $PKG" && exit 1
+          fi
+      - run: npm ci
+      - run: npm test
+      - run: npm pack
+      - name: Rename tarball to stable asset name
+        run: cp $(node -p "require('./package.json').name + '-' + require('./package.json').version + '.tgz'") hooktap.tgz
+      - name: sha256
+        run: sha256sum hooktap-*.tgz hooktap.tgz > SHA256SUMS.txt
+      - name: Extract release notes
+        run: |
+          awk '/^## \[/{if (found) exit; found=1} found{print}' CHANGELOG.md > notes.md
+          head -n 40 notes.md > body.md
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file body.md
+          gh release upload "$GITHUB_REF_NAME" hooktap-*.tgz hooktap.tgz SHA256SUMS.txt --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false
+      - name: Read back asset names
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$GITHUB_REF_NAME" --json assets --jq '.assets[].name'

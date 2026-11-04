@@ -1,0 +1,11 @@
+# Normalise line endings on checkout so a Windows clone and a Linux clone of
+# this repository produce the same bytes. Without this, every file shows up as
+# modified on one of the two.
+* text=auto eol=lf
+
+# A shell fixture is a script; let it keep the shebang-mandated LF on every OS.
+*.sh text eol=lf
+
+# The lockfile is text: without this line git can decide it is binary and
+# a dependency change shows up as "Binary files differ" with no diff to read.
+package-lock.json text eol=lf

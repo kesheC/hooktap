@@ -1,0 +1,112 @@
+name: Bug report
+description: Something in hooktap behaves differently than documented.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Two things make a bug report land quickly:
+        a **minimal reproduction** and **exact output**. Please do not paste
+        secrets — hooktap never needs them to reproduce a bug.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+      placeholder: |
+        Expected: ...
+        Actual:   ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence of commands that still shows the bug.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Actual output
+      description: The full command and its complete stdout/stderr. Trim the tail only if it is repetitive.
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: command
+    attributes:
+      label: Which command
+      options:
+        - check
+        - diff
+        - sync
+        - mask
+        - init
+        - not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: hooktap version
+      description: The output of `hooktap --version`.
+      placeholder: x.y.z (paste what --version prints)
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      description: The output of `node --version`. The supported floor is 20.11.
+      placeholder: v22.11.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 / Ubuntu 24.04 / macOS 15
+    validations:
+      required: true
+
+  - type: input
+    id: install
+    attributes:
+      label: How you installed it
+      description: Release tarball, built from a checkout, or something else.
+      placeholder: npm install -g https://github.com/kesheC/hooktap/releases/latest/download/hooktap.tgz
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Relevant input — the key names involved (never paste real secret values).
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched the existing issues and this is not a duplicate.
+          required: true
+        - label: I removed secrets and personal data from the pasted output.
+          required: true
+        - label: This is not a security vulnerability (those go through SECURITY.md, never a public issue).
+          required: true
