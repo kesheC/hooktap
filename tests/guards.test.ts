@@ -37,6 +37,11 @@ describe("bin shebang", () => {
     expect(read("src/cli.ts").startsWith("#!/usr/bin/env node")).toBe(true);
     expect(read("dist/cli.js").startsWith("#!/usr/bin/env node")).toBe(true);
   });
+
+  it("resolves the CLI entry through realpathSync", () => {
+    // A symlinked bin (npm global .bin links) must still hit the main-module check.
+    expect(read("src/cli.ts")).toContain("realpathSync");
+  });
 });
 
 describe("package contract", () => {

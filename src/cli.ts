@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { hmacVerify, signBody } from "./verify.js";
 import { createCaptureServer } from "./server.js";
@@ -202,7 +203,11 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
 
 // Exact-path comparison, not a suffix regex: /cli\.(c|m)?js$/ would also
 // fire for an unrelated "my-cli.js" imported by some other tool.
-const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+// realpathSync: a symlinked bin (npm global installs link node_modules/.bin)
+// resolves to the real dist file, so the main-module check still matches.
+const isMain =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href;
 if (isMain) {
   installPipeGuard();
   // Never process.exit(main(...)): the replay command completes asynchronously, and an
