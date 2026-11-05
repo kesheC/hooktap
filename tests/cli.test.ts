@@ -288,3 +288,52 @@ describe("cli listen", () => {
     blocker.close();
   }, 15000);
 });
+
+describe("cli argument strictness", () => {
+  it("rejects unknown --* flags (typo protection)", () => {
+    const file = storeFixture([capture({ headers: { "x-hub-signature-256": signBody("s3cret", '{"event":"ping"}') } })]);
+    const s = memStreams();
+    // "--indexs" (typo) used to be silently ignored and capture 0 was verified.
+    expect(main(["verify", file, "--secret", "s3cret", "--indexs", "1"], s.stdout, s.stderr)).toBe(2);
+    expect(s.err.join("")).toContain("unknown option: --indexs");
+  });
+
+  it("rejects a value flag followed by another flag", () => {
+    const s = memStreams();
+    // "--secret --json" used to make the secret the literal string "--json".
+    expect(main(["verify", "whatever.json", "--secret", "--json"], s.stdout, s.stderr)).toBe(2);
+    expect(s.err.join("")).toContain("--secret needs a value");
+  });
+
+  it("rejects a trailing value flag with no value", () => {
+    // loadCaptures runs before flag validation, so use a real store file;
+    // "--index" at the end used to silently fall back to capture 0.
+    const file = storeFixture([capture()]);
+    const s = memStreams();
+    expect(main(["verify", file, "--secret", "k", "--index"], s.stdout, s.stderr)).toBe(2);
+    expect(s.err.join("")).toContain("--index needs a value");
+  });
+
+  it("verifies a raw:null capture against the decoded body (rc 0)", () => {
+    // raw === null means "payload not storable as UTF-8"; verify used to hash
+    // the string "null" and disagree with replay, which falls back to body.
+    const rec = {
+      ...capture(),
+      headers: { "x-hub-signature-256": signBody("s3cret", '{"event":"ping"}') },
+      raw: null,
+    } as unknown as CaptureRecord;
+    const file = storeFixture([rec]);
+    const s = memStreams();
+    expect(main(["verify", file, "--secret", "s3cret"], s.stdout, s.stderr)).toBe(0);
+    expect(s.out.join("")).toContain("valid:     yes");
+  });
+
+  it("reports a null capture entry as malformed instead of crashing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "hooktap-cli-"));
+    const file = join(dir, "store.json");
+    writeFileSync(file, JSON.stringify({ formatVersion: 1, tape: "fixture", captures: [null] }));
+    const s = memStreams();
+    expect(main(["verify", file, "--secret", "k"], s.stdout, s.stderr)).toBe(2);
+    expect(s.err.join("")).toContain("capture 0 malformed");
+  });
+});

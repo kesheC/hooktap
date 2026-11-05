@@ -36,8 +36,14 @@ USAGE
 
 function argValue(args: string[], flag: string): string | undefined {
   const i = args.indexOf(flag);
-  if (i === -1 || i + 1 >= args.length) return undefined;
-  return args[i + 1];
+  if (i === -1) return undefined;
+  const next: string | undefined = args[i + 1];
+  // A value flag followed by another flag (or by nothing) is a usage error:
+  // "--secret --json" used to silently make the secret the string "--json".
+  if (next === undefined || next.startsWith("-")) {
+    throw new Error("option " + flag + " needs a value");
+  }
+  return next;
 }
 
 function hasFlag(args: string[], flag: string): boolean {
@@ -45,6 +51,13 @@ function hasFlag(args: string[], flag: string): boolean {
 }
 
 const VALUE_FLAGS = new Set(["--port", "--host", "--out", "--secret", "--scheme", "--to", "--index", "--last"]);
+
+// Every flag the CLI understands; anything else starting with "--" is a typo
+// and must be rejected instead of silently ignored.
+const ALLOWED_FLAGS = new Set([
+  "--port", "--host", "--out", "--quiet", "--secret", "--scheme",
+  "--to", "--index", "--last", "--json",
+]);
 
 function positional(args: string[], trailing: string[] = []): string | undefined {
   for (let i = 0; i < args.length; i++) {
@@ -72,6 +85,14 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
   const rest = pre.slice(1);
 
   const fail = (msg: string): number => { stderr.write("error: " + msg + "\n"); return 2; };
+
+  // Typo'd flags must not be silently ignored: "--indexs 1" used to verify
+  // capture 0 while the operator believed they were verifying capture 1.
+  for (const token of rest) {
+    if (token.startsWith("--") && !ALLOWED_FLAGS.has(token)) {
+      return fail("unknown option: " + token);
+    }
+  }
 
   if (cmd === "listen") {
     const port = Number(argValue(rest, "--port") ?? "0");
@@ -107,9 +128,16 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
       const index = Number(argValue(rest, "--index") ?? "0");
       if (!Number.isInteger(index) || index < 0 || index >= captures.length) return fail("index " + argValue(rest, "--index") + " out of range (" + captures.length + " captures)");
       const recAny: unknown = captures[index];
-      if (recAny === undefined || typeof recAny !== "object") return fail("capture " + index + " malformed");
+      // typeof null === "object", so a null entry needs its own guard; a
+      // missing or non-object headers field would also crash deep inside.
+      const headersOk = recAny !== null && typeof recAny === "object"
+        && typeof (recAny as { headers?: unknown }).headers === "object"
+        && (recAny as { headers?: unknown }).headers !== null;
+      if (!headersOk) return fail("capture " + index + " malformed");
       const rec = recAny as CaptureRecord;
-      const payload = rec.raw !== undefined ? rec.raw : typeof rec.body === "string" ? rec.body : JSON.stringify(rec.body);
+      // raw === null marks a non-UTF-8 payload on disk; hashing the string
+      // "null" would be nonsense, so fall back to the body like replay does.
+      const payload = rec.raw != null ? rec.raw : typeof rec.body === "string" ? rec.body : JSON.stringify(rec.body);
       const result = hmacVerify(secret, rec.headers, payload);
       if (hasFlag(rest, "--json")) stdout.write(JSON.stringify(result, null, 2) + "\n");
       else stdout.write(renderVerify(result) + "\n");

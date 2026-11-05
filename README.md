@@ -151,7 +151,7 @@ body:  accepted
 $ kill %1 2>/dev/null
 ```
 
-Replay re-sends the exact captured bytes: same method, same path, same headers, same body — with `host`, `connection`, and other hop-by-hop headers stripped and `content-length` recomputed. Missing `--to` is an error (`error: --to URL is required`, exit 2). Byte-for-byte fidelity applies to UTF-8 text payloads; binary payloads are not guaranteed to round-trip (see the on-disk format note below).
+Replay re-sends the exact captured bytes: same method, same headers, same body — delivered to the path of the `--to` URL (the captured path is not reused) — with `host`, `connection`, and other hop-by-hop headers stripped and `content-length` recomputed. Missing `--to` is an error (`error: --to URL is required`, exit 2). Byte-for-byte fidelity applies to UTF-8 text payloads; binary payloads are not guaranteed to round-trip (see the on-disk format note below).
 
 ### inspect
 
@@ -241,7 +241,7 @@ hooktap 运行一个小型 HTTP 服务器，记录它收到的每个请求（请
 - **捕获（Capture）** —— `hooktap listen` 记录发到本地服务器的请求。每条捕获保留收到的原始字节（`raw`），不是重新序列化的结果，所以签名始终可验证。
 - **验签（Verify）** —— `hooktap verify` 用常时比较（constant-time comparison）校验 HMAC 签名与原始字节，摘要读取自 `x-hub-signature-256`、`x-hub-signature`、`x-signature-256` 或 `x-signature`（支持 sha256 与 sha1）。不匹配时报告第一个不同的十六进制半字节（nibble）。
 - **签名（Sign）** —— `hooktap sign` 打印发送方为一个请求体附加的签名，测试夹具不需要自己写加密代码。
-- **重放（Replay）** —— `hooktap replay` 把第 N 条捕获逐字节重发到任意 URL，`content-length` 重新计算，逐跳（hop-by-hop）请求头被剔除。字节级保真对 UTF-8 文本载荷成立；二进制载荷不保证（见磁盘格式一节的说明）。
+- **重放（Replay）** —— `hooktap replay` 把第 N 条捕获逐字节重发到 `--to` 指定 URL 的路径（不沿用捕获时的路径），方法、请求头、请求体保持原样，`content-length` 重新计算，逐跳（hop-by-hop）请求头被剔除。字节级保真对 UTF-8 文本载荷成立；二进制载荷不保证（见磁盘格式一节的说明）。
 - **检查（Inspect）** —— `hooktap inspect` 打印存储的捕获，文本或 JSON 两种格式。
 
 ## 环境要求

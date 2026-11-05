@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- nothing yet
+### Fixed
+
+- `verify` treats a stored `raw` of `null` as "payload not stored" and falls back to the decoded body, matching replay semantics (it used to hash the string `"null"`).
+- `verify` reports malformed captures (a `null` entry or a record without object `headers`) as a clean exit-2 error instead of an uncaught `TypeError`.
+- Unknown `--*` options are rejected with exit 2 instead of being silently ignored, and value flags followed by another flag (or no value at all) are usage errors.
+- `replayCapture` rejects its promise for invalid arguments instead of throwing synchronously, and refuses non-http(s) target schemes with a clear error.
+- `listen --host` with an IPv6 address now prints a parseable URL (`http://[::1]:PORT`).
+- Broken-pipe guard: a closed reader on stdout/stderr no longer crashes the CLI.
 
 ## [0.1.2] - 2026-11-05
 

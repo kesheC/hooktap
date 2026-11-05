@@ -122,3 +122,13 @@ describe("createCaptureServer", () => {
     process.exitCode = before;
   });
 });
+
+describe("capture server URL", () => {
+  it("brackets IPv6 hosts in the advertised URL", async () => {
+    const s = await createCaptureServer({ port: 0, host: "::1" });
+    servers.push(s);
+    expect(s.url).toMatch(/^http:\/\/\[::1\]:\d+$/);
+    // ...and the advertised URL must actually parse
+    expect(() => new URL(s.url)).not.toThrow();
+  });
+});

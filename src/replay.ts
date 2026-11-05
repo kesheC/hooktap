@@ -46,10 +46,25 @@ function cleanResponseHeaders(res: http.IncomingMessage): Headers {
   return out;
 }
 
-/** Re-send one captured request to a (usually local) target server. */
+/**
+ * Re-send one captured request to a (usually local) target server.
+ * Argument validation happens before any await, so misuse reaches the caller
+ * as a rejected promise (not a synchronous throw that escapes .catch()).
+ */
 export function replayCapture(record: CaptureRecord, targetUrl: string, timeoutMs = 10000): Promise<ReplayResult> {
+  if (record === null || typeof record !== "object") {
+    return Promise.reject(new Error("replayCapture needs a capture record"));
+  }
+  let url: URL;
+  try {
+    url = new URL(targetUrl);
+  } catch (e) {
+    return Promise.reject(new Error("replay target must be a valid URL: " + String(targetUrl)));
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return Promise.reject(new Error("unsupported replay scheme " + url.protocol + " (only http/https)"));
+  }
   const body = bodyText(record);
-  const url = new URL(targetUrl);
   const transport = url.protocol === "https:" ? https : http;
   const headers = cleanHeaders(record.headers);
   const bodyless = record.method === "GET" || record.method === "HEAD";

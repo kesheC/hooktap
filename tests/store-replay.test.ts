@@ -210,3 +210,19 @@ describe("replayCapture", () => {
     target.close();
   });
 });
+
+describe("replayCapture promise contract", () => {
+  it("rejects instead of sync-throwing for a null record", async () => {
+    await expect(replayCapture(null as unknown as Parameters<typeof replayCapture>[0], "http://127.0.0.1:1/x")).rejects.toThrow(/capture record/);
+  });
+
+  it("rejects instead of sync-throwing for an invalid URL", async () => {
+    const rec = { method: "POST", url: "/h", headers: {}, body: "x", raw: "x", receivedAt: "", remote: "" };
+    await expect(replayCapture(rec as unknown as Parameters<typeof replayCapture>[0], "not-a-url")).rejects.toThrow(/valid URL/);
+  });
+
+  it("rejects non-http(s) schemes with a clear error", async () => {
+    const rec = { method: "POST", url: "/h", headers: {}, body: "x", raw: "x", receivedAt: "", remote: "" };
+    await expect(replayCapture(rec as unknown as Parameters<typeof replayCapture>[0], "ftp://127.0.0.1:1/x")).rejects.toThrow(/unsupported replay scheme ftp:/);
+  });
+});

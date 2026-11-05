@@ -109,7 +109,8 @@ export function createCaptureServer(opts: ServeOptions = {}): Promise<CaptureSer
       const realPort = typeof address === "object" && address !== null ? address.port : port;
       const captureServer: CaptureServer = {
         port: realPort,
-        url: "http://" + (host === "0.0.0.0" ? "127.0.0.1" : host) + ":" + realPort,
+        // An IPv6 host must be bracketed in a URL: "http://::1:8080" does not parse.
+        url: "http://" + (host === "0.0.0.0" ? "127.0.0.1" : host.includes(":") ? "[" + host + "]" : host) + ":" + realPort,
         captures: store.captures,
         close: () => new Promise<void>((res) => { server.close(() => res()); }),
       };
