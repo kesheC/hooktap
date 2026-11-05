@@ -1,6 +1,6 @@
 {
   "name": "hooktap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local webhook capture, signature verification and replay for development",
   "type": "module",
   "main": "./dist/index.js",

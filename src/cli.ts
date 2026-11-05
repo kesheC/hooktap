@@ -6,7 +6,7 @@ import { renderRecord, renderVerify } from "./render.js";
 import { replayCapture } from "./replay.js";
 import type { CaptureRecord } from "./types.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.1.1";
 
 const HELP = `hooktap ${VERSION} - capture, verify and replay webhooks locally
 

@@ -65,7 +65,7 @@ await capture.close();
 
 ```bash
 $ node dist/cli.js --help
-hooktap 0.1.0 - capture, verify and replay webhooks locally
+hooktap 0.1.1 - capture, verify and replay webhooks locally
 
 USAGE
   hooktap listen [--port N] [--host H] [--out FILE] [--quiet]
