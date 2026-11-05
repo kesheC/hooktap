@@ -5,6 +5,7 @@ import { createCaptureServer } from "./server.js";
 import { loadCaptures } from "./store.js";
 import { renderRecord, renderVerify } from "./render.js";
 import { replayCapture } from "./replay.js";
+import { installPipeGuard } from "./pipe.js";
 import type { CaptureRecord } from "./types.js";
 
 export const VERSION = "0.1.2";
@@ -175,6 +176,7 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
 // fire for an unrelated "my-cli.js" imported by some other tool.
 const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
+  installPipeGuard();
   // Never process.exit(main(...)): the replay command completes asynchronously, and an
   // immediate exit would kill the in-flight request before it prints. Setting exitCode
   // lets sync commands keep their codes (fail returns 1/2) while async work drains.
