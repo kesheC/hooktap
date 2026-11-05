@@ -108,3 +108,15 @@ describe("dependabot", () => {
     expect(dep).toContain("@types/node");
   });
 });
+
+describe("docs contract", () => {
+  it("keeps hand-written test counts out of README and CONTRIBUTING", () => {
+    // Test counts drift on every suite change (a released README once claimed a stale count).
+    // The npm test line documents the experience, not a number; CHANGELOG Quality lines carry counts at release time.
+    for (const file of ["README.md", "CONTRIBUTING.md"]) {
+      const text = read(file);
+      expect(text).not.toMatch(/\b\d+ tests?\b/);
+      expect(text).not.toMatch(/\b\d+ 个测试/);
+    }
+  });
+});
