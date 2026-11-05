@@ -93,15 +93,21 @@ USAGE
 
 ### listen
 
-```text
-$ hooktap listen --port 49713
-hooktap listening on http://127.0.0.1:49713
+```bash
+$ rm -f demo/store.json demo/listen.log
+$ node dist/cli.js listen --port 49713 --out demo/store.json 2> demo/listen.log & SERVER=$!
+$ until grep -q listening demo/listen.log 2>/dev/null; do sleep 0.2; done
+$ curl -s -X POST http://127.0.0.1:49713/hook -H 'content-type: application/json' -d '{"event":"ping"}'; echo
+{"captured":1}
+$ cat demo/listen.log
+hooktap listening on http://127.0.0.1:49713 (store: demo/store.json)
 send a webhook: curl -X POST http://127.0.0.1:49713/hook -H 'content-type: application/json' -d '{"event":"ping"}'
 press Ctrl-C to stop
 captured: POST /hook (#1)
+$ kill $SERVER 2>/dev/null; wait $SERVER 2>/dev/null
 ```
 
-(The capture line appears when a request arrives.) With `--out FILE` the store file is rewritten after every request, so a Ctrl-C never loses captures. Each sender receives `{"captured":N}` with status 200.
+(The capture line appears when a request arrives; the banner and hint lines go to stderr, redirected to `demo/listen.log` here so stdout stays parseable.) With `--out FILE` the store file is rewritten after every request, so a Ctrl-C never loses captures. Each sender receives `{"captured":N}` with status 200.
 
 ### sign and verify
 
