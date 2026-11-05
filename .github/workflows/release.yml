@@ -34,7 +34,7 @@ jobs:
         run: sha256sum hooktap-*.tgz hooktap.tgz > SHA256SUMS.txt
       - name: Extract release notes
         run: |
-          awk '/^## \[/{if (found) exit; found=1} found{print}' CHANGELOG.md > notes.md
+          awk '/^## \[/{if ($0 ~ /\[Unreleased\]/) next; if (found) exit; found=1} found{print}' CHANGELOG.md > notes.md
           head -n 40 notes.md > body.md
       - name: Create GitHub Release
         env:

@@ -1,6 +1,16 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
-import { emptyStore, saveCaptures } from "./store.js";
+import { renameSync, writeFileSync } from "node:fs";
+import { emptyStore } from "./store.js";
 import type { CaptureRecord, CaptureServer, CaptureStore, Headers, ServeOptions } from "./types.js";
+
+const DEFAULT_MAX_BODY_BYTES = 10 * 1024 * 1024; // 10 MiB
+
+/** Write via a temp file + rename so a crash mid-write cannot leave a torn store. */
+function saveAtomic(store: CaptureStore, outPath: string): void {
+  const tmp = outPath + ".tmp";
+  writeFileSync(tmp, JSON.stringify(store, null, 2) + "\n", "utf8");
+  renameSync(tmp, outPath);
+}
 
 const HOP_BY_HOP = new Set([
   "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
@@ -44,15 +54,35 @@ function captureFromRequest(req: IncomingMessage, rawBytes: Buffer, remote: stri
  */
 export function createCaptureServer(opts: ServeOptions = {}): Promise<CaptureServer> {
   const store: CaptureStore = emptyStore(opts.name ?? "captures");
+  const maxBodyBytes = opts.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
   const server: Server = createServer((req, res) => {
     const chunks: Buffer[] = [];
-    req.on("data", (c: Buffer) => chunks.push(c));
+    let received = 0;
+    let oversized = false;
+    req.on("data", (c: Buffer) => {
+      received += c.length;
+      if (received > maxBodyBytes) {
+        oversized = true;
+        return;
+      }
+      chunks.push(c);
+    });
     req.on("end", () => {
+      if (oversized) {
+        process.stderr.write("hooktap: request body exceeds maxBodyBytes (" + maxBodyBytes + "); rejecting with 413\n");
+        res.statusCode = 413;
+        res.end();
+        return;
+      }
       const remote = req.socket.remoteAddress ?? "unknown";
       const record = captureFromRequest(req, Buffer.concat(chunks), remote);
       store.captures.push(record);
       if (opts.outPath) {
-        try { saveCaptures(store, opts.outPath); } catch { /* keep serving */ }
+        try {
+          saveAtomic(store, opts.outPath);
+        } catch (e) {
+          process.stderr.write("hooktap: failed to persist capture store: " + (e instanceof Error ? e.message : String(e)) + "\n");
+        }
       }
       if (!opts.quiet) process.stderr.write("captured: " + record.method + " " + record.url + " (#" + store.captures.length + ")\n");
       res.statusCode = 200;

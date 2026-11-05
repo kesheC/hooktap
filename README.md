@@ -145,7 +145,7 @@ body:  accepted
 $ kill %1 2>/dev/null
 ```
 
-Replay re-sends the exact captured bytes: same method, same path, same headers, same body — with `host`, `connection`, and other hop-by-hop headers stripped and `content-length` recomputed. Missing `--to` is an error (`error: --to URL is required`, exit 2).
+Replay re-sends the exact captured bytes: same method, same path, same headers, same body — with `host`, `connection`, and other hop-by-hop headers stripped and `content-length` recomputed. Missing `--to` is an error (`error: --to URL is required`, exit 2). Byte-for-byte fidelity applies to UTF-8 text payloads; binary payloads are not guaranteed to round-trip (see the on-disk format note below).
 
 ### inspect
 
@@ -187,6 +187,8 @@ A capture store is a JSON file:
 
 `body` is decoded for readability (JSON bodies become objects); `raw` is the exact utf8 text received. Verification and replay read `raw`. `formatVersion` is 1; loaders reject files with a different version instead of guessing.
 
+One fidelity limit: `raw` is stored as UTF-8 text, so byte-for-byte capture and replay hold for UTF-8 text payloads. A request body that is not valid UTF-8 (gzip, protobuf, or other binary payloads) does not survive the store round-trip and its replay is not guaranteed to be byte-identical.
+
 ## Library API
 
 | Export | Signature | Notes |
@@ -202,7 +204,7 @@ A capture store is a JSON file:
 
 ```bash
 npm install
-npm test          # pretest builds first; 54 tests, offline, no network
+npm test          # pretest builds first; 60 tests, offline, no network
 npm run coverage  # thresholds 80/70/85/80
 npm run dev -- --help
 npm run build
@@ -233,7 +235,7 @@ hooktap 运行一个小型 HTTP 服务器，记录它收到的每个请求（请
 - **捕获（Capture）** —— `hooktap listen` 记录发到本地服务器的请求。每条捕获保留收到的原始字节（`raw`），不是重新序列化的结果，所以签名始终可验证。
 - **验签（Verify）** —— `hooktap verify` 用常时比较（constant-time comparison）校验 HMAC 签名与原始字节，摘要读取自 `x-hub-signature-256`、`x-hub-signature`、`x-signature-256` 或 `x-signature`（支持 sha256 与 sha1）。不匹配时报告第一个不同的十六进制半字节（nibble）。
 - **签名（Sign）** —— `hooktap sign` 打印发送方为一个请求体附加的签名，测试夹具不需要自己写加密代码。
-- **重放（Replay）** —— `hooktap replay` 把第 N 条捕获逐字节重发到任意 URL，`content-length` 重新计算，逐跳（hop-by-hop）请求头被剔除。
+- **重放（Replay）** —— `hooktap replay` 把第 N 条捕获逐字节重发到任意 URL，`content-length` 重新计算，逐跳（hop-by-hop）请求头被剔除。字节级保真对 UTF-8 文本载荷成立；二进制载荷不保证（见磁盘格式一节的说明）。
 - **检查（Inspect）** —— `hooktap inspect` 打印存储的捕获，文本或 JSON 两种格式。
 
 ## 环境要求
@@ -294,6 +296,8 @@ await capture.close();
 
 捕获存储是一个 JSON 文件：`formatVersion`（当前为 1，版本不符时加载器直接拒绝而不是猜测）+ `captures` 数组。每条记录里 `body` 是解码后的可读形式（JSON body 解析为对象），`raw` 是收到的原始 utf8 文本；验签与重放读 `raw`。
 
+一条保真限制：`raw` 以 UTF-8 文本存储，字节级保真的捕获与重放只对 UTF-8 文本载荷成立；非合法 UTF-8 的请求体（gzip、protobuf 等二进制载荷）经存储往返会失真，重放不保证逐字节一致。
+
 ## 库 API
 
 | 导出 | 签名 | 说明 |
@@ -309,7 +313,7 @@ await capture.close();
 
 ```bash
 npm install
-npm test          # pretest 先构建；54 个测试，离线，不访问网络
+npm test          # pretest 先构建；60 个测试，离线，不访问网络
 npm run coverage  # 阈值 80/70/85/80
 npm run dev -- --help
 npm run build

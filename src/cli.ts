@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { hmacVerify, signBody } from "./verify.js";
 import { createCaptureServer } from "./server.js";
 import { loadCaptures } from "./store.js";
@@ -74,6 +74,11 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
       stderr.write("hooktap listening on " + server.url + (outPath ? " (store: " + outPath + ")" : "") + "\n");
       stderr.write("send a webhook: curl -X POST " + server.url + "/hook -H 'content-type: application/json' -d '{\"event\":\"ping\"}'\n");
       stderr.write("press Ctrl-C to stop\n");
+    }, (err) => {
+      // EADDRINUSE and friends: report on stderr, set the exit code, and let
+      // the process end on its own (never process.exit - it would kill async work).
+      stderr.write("hooktap: listen error: " + (err instanceof Error ? err.message : String(err)) + "\n");
+      process.exitCode = 2;
     });
     // The server keeps the process alive; Ctrl-C tears it down.
     return 0;
@@ -85,8 +90,10 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
       if (!secret) return fail("--secret is required");
       const file = positional(rest);
       if (!file) return fail("missing FILE argument (see --help)");
-      const raw = JSON.parse(readFileSync(file, "utf8")) as { captures?: unknown[] } | unknown[];
-      const captures: unknown[] = Array.isArray(raw) ? raw : raw.captures ?? [];
+      // loadCaptures is the single entry point for reading stores: it carries
+      // the formatVersion and shape checks, so verify must not bypass it.
+      const store = loadCaptures(file);
+      const captures = store.captures;
       if (captures.length === 0) return fail("no captures in " + file);
       const index = Number(argValue(rest, "--index") ?? "0");
       if (!Number.isInteger(index) || index < 0 || index >= captures.length) return fail("index " + argValue(rest, "--index") + " out of range (" + captures.length + " captures)");
@@ -156,7 +163,9 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
   }
 }
 
-const isMain = process.argv[1] !== undefined && /cli\.(c|m)?js$/.test(process.argv[1]);
+// Exact-path comparison, not a suffix regex: /cli\.(c|m)?js$/ would also
+// fire for an unrelated "my-cli.js" imported by some other tool.
+const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
   // Never process.exit(main(...)): the replay command completes asynchronously, and an
   // immediate exit would kill the in-flight request before it prints. Setting exitCode

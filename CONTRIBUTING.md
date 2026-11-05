@@ -1,8 +1,9 @@
 # Contributing to hooktap
 
-Thanks for wanting to help. `hooktap` is a small tool that does one thing: turn a
-conventional-commit log into a decided, gated, frozen release - plan, gates, freeze, tag,
-pack - without a registry dependency.
+Thanks for wanting to help. `hooktap` is a small tool that does one thing: capture webhook
+requests exactly as they arrived, verify their HMAC signatures, and replay them byte-for-byte
+to a target - a local-first debugging tool for webhook integrations. It ships no runtime
+dependencies.
 
 ## Before you start
 
@@ -63,16 +64,21 @@ install to work on it *is* the whole supply chain. It fails on high and critical
 only; a moderate finding is worth reading when you next touch the dependencies, but it is not
 worth blocking an unrelated fix.
 
-## The README transcripts are executable
+## The README transcripts
 
-Every command transcript in README.md is verified against the real CLI before it is committed,
-and the guard tests re-verify the example blocks that CI can run. If your change alters CLI
-output, the transcripts change with it, in the same pull request. A README that shows output
-the code does not produce is treated as a bug, not documentation drift.
+The command transcripts in README.md are produced against the real CLI when they are written.
+They are not re-executed by CI: the test suite runs the unit and guard tests only, and a
+maintainer re-verifies the transcripts manually (against the built `node dist/cli.js`) before
+each release. If your change alters CLI output, update the transcripts in the same pull
+request. A README that shows output the code does not produce is treated as a bug, not
+documentation drift.
 
 ## Release policy
 
-`hooktap` releases itself: freeze the changelog, run the gates, tag, pack. A maintainer
-runs `node dist/cli.js release`, pushes the tag, and the Release workflow attaches the tarball
-and its checksum. Do not bump versions by hand in a pull request; the bump is decided from the
-commit log at release time.
+Releases are cut by a maintainer: freeze the changelog, run the gates, bump the version,
+tag, pack. There is no release subcommand in the CLI - the supported paths are the
+`releaseforge` CLI (plan / gates / freeze / release) or the manual sequence: update
+CHANGELOG.md, bump `version` in package.json, commit, tag `v<version>` and push the tag. The
+Release workflow verifies the tag matches `package.json`, runs the tests, and attaches the
+tarball and its checksum. Do not bump versions by hand in a pull request; the bump happens at
+release time, after the gates pass.

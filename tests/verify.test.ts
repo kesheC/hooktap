@@ -38,6 +38,15 @@ describe("hmacVerify", () => {
     expect(result.computed).toBe("5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
   });
 
+  it("accepts a signature sent under an ALL-CAPS header name", () => {
+    // Library callers pass camel/caps keys ("X-Hub-Signature-256"); the lookup
+    // normalizes keys to lowercase before matching, so this must verify.
+    const result = hmacVerify("Jefe", { "X-Hub-Signature-256": goodSig }, RFC_DATA);
+    expect(result.valid).toBe(true);
+    expect(result.scheme).toBe("sha256");
+    expect(result.headerName).toBe("x-hub-signature-256");
+  });
+
   it("accepts x-hub-signature (sha1) form", () => {
     const sig = signBody("Jefe", RFC_DATA, "sha1");
     const result = hmacVerify("Jefe", { "x-hub-signature": sig }, RFC_DATA);

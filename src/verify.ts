@@ -40,8 +40,13 @@ export function hmacVerify(
   headers: Headers,
   body: string | Record<string, unknown>,
 ): VerifyResult {
+  // Callers may pass header keys in any case (an SDK user sends
+  // "X-Hub-Signature-256", Node delivers "x-hub-signature-256"); normalize
+  // once so the lookup below cannot silently miss an uppercase key.
+  const lower: Headers = {};
+  for (const [k, v] of Object.entries(headers)) lower[k.toLowerCase()] = v;
   for (const name of SIGNATURE_HEADERS) {
-    const value = headers[name] ?? headers[name.toLowerCase()];
+    const value = lower[name];
     if (value === undefined) continue;
     const parsed = parseSignatureHeader(value);
     if (!parsed) {

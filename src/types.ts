@@ -38,6 +38,8 @@ export interface ServeOptions {
   outPath?: string;
   name?: string;
   quiet?: boolean;
+  /** Maximum accepted request body in bytes; larger requests get 413. Default 10 MiB. */
+  maxBodyBytes?: number;
 }
 
 export interface CaptureServer {

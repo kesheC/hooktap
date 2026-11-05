@@ -100,4 +100,73 @@ describe("replayCapture", () => {
     target.closeAllConnections();
     target.close();
   });
+
+  it("omits content-length for bodyless GET replays", async () => {
+    // A GET that declares a content-length it never sends can wedge a target;
+    // the fix drops content-length whenever the body write is skipped.
+    const seen: Array<{ method: string; cl?: string; body: string }> = [];
+    const target = createServer((req, res) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c));
+      req.on("end", () => {
+        seen.push({ method: req.method ?? "", cl: req.headers["content-length"] as string | undefined, body: Buffer.concat(chunks).toString("utf8") });
+        res.statusCode = 200;
+        res.end("ok");
+      });
+    });
+    await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
+    const port = (target.address() as { port: number }).port;
+    const record = { method: "GET", url: "/q?a=1", headers: { host: "original:1" }, body: "", raw: "", receivedAt: "t", remote: "r" };
+    const result = await replayCapture(record, "http://127.0.0.1:" + port + "/q?a=1");
+    expect(result.status).toBe(200);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.method).toBe("GET");
+    expect(seen[0]!.cl).toBeUndefined();
+    expect(seen[0]!.body).toBe("");
+    target.closeAllConnections();
+    target.close();
+  });
+
+  it("keeps replaying under an absolute deadline even when the target drips data", async () => {
+    // req.setTimeout is an idle timer; a target that trickles bytes resets it
+    // forever. The wrapper's absolute setTimeout must still fire and reject.
+    const target = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "text/plain" });
+      res.write("chunk");
+      const timer = setInterval(() => res.write("x"), 20);
+      res.on("close", () => clearInterval(timer));
+    });
+    await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
+    const port = (target.address() as { port: number }).port;
+    const record = { method: "GET", url: "/", headers: {}, body: "", raw: "", receivedAt: "t", remote: "r" };
+    const started = Date.now();
+    await expect(replayCapture(record, "http://127.0.0.1:" + port + "/", 200)).rejects.toThrowError(/timed out/);
+    const elapsed = Date.now() - started;
+    expect(elapsed).toBeGreaterThanOrEqual(150);
+    expect(elapsed).toBeLessThan(2000);
+    target.closeAllConnections();
+    target.close();
+  });
+
+  it("strips response hop-by-hop headers, including those named by Connection", async () => {
+    const target = createServer((_req, res) => {
+      res.setHeader("connection", "close, x-drop-me");
+      res.setHeader("x-drop-me", "gone");
+      res.setHeader("keep-alive", "timeout=5");
+      res.setHeader("transfer-encoding", "chunked");
+      res.setHeader("x-keep-me", "here");
+      res.end("done");
+    });
+    await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
+    const port = (target.address() as { port: number }).port;
+    const record = { method: "GET", url: "/", headers: {}, body: "", raw: "", receivedAt: "t", remote: "r" };
+    const result = await replayCapture(record, "http://127.0.0.1:" + port + "/");
+    expect(result.status).toBe(200);
+    for (const banned of ["connection", "x-drop-me", "keep-alive", "transfer-encoding"]) {
+      expect(Object.keys(result.headers)).not.toContain(banned);
+    }
+    expect(result.headers["x-keep-me"]).toBe("here");
+    target.closeAllConnections();
+    target.close();
+  });
 });

@@ -185,4 +185,23 @@ describe("cli listen", () => {
     expect(main(["listen", "--port", "nope"], s.stdout, s.stderr)).toBe(2);
     expect(main(["listen", "--port", "99999"], s.stdout, s.stderr)).toBe(2);
   });
+
+  it("reports listen errors (EADDRINUSE) on stderr with rc 2 in a child process", async () => {
+    // In-process listen failure would crash the worker; the real contract is
+    // "child exits 2 with a stderr message", so test the entrypoint directly.
+    const { spawn } = await import("node:child_process");
+    const net = await import("node:net");
+    const blocker = net.createServer();
+    await new Promise<void>((r) => blocker.listen(0, "127.0.0.1", r));
+    const port = (blocker.address() as { port: number }).port;
+    const { join, dirname } = await import("node:path");
+    const cliPath = join(dirname(dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, "$1"))), "dist", "cli.js");
+    const child = spawn(process.execPath, [cliPath, "listen", "--port", String(port)], { stdio: ["ignore", "ignore", "pipe"] });
+    let stderrOut = "";
+    child.stderr!.on("data", (c: Buffer) => { stderrOut += c.toString("utf8"); });
+    const rc = await new Promise<number>((resolve) => child.on("close", (code) => resolve(code ?? -1)));
+    expect(rc).toBe(2);
+    expect(stderrOut).toContain("hooktap: listen error");
+    blocker.close();
+  }, 15000);
 });

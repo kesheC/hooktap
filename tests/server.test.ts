@@ -80,6 +80,18 @@ describe("createCaptureServer", () => {
     expect(store2.captures).toHaveLength(2);
   });
 
+  it("rejects bodies over maxBodyBytes with 413", async () => {
+    const server = await createCaptureServer({ quiet: true, maxBodyBytes: 8 });
+    servers.push(server);
+    const res = await post(server.url + "/big", "1234567890", { "content-type": "text/plain" });
+    expect(res.status).toBe(413);
+    expect(server.captures).toHaveLength(0);
+    // A body within the limit still captures normally afterwards.
+    const ok = await post(server.url + "/small", "1234", { "content-type": "text/plain" });
+    expect(ok.status).toBe(200);
+    expect(server.captures).toHaveLength(1);
+  });
+
   it("binds an ephemeral port and reports the real one", async () => {
     const server = await createCaptureServer({ quiet: true });
     servers.push(server);
