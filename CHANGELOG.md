@@ -10,6 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - nothing yet
 
+## [0.1.2] - 2026-11-05
+
+### Fixed
+
+- The `hooktap` bin ships with a shebang, so global installs work on Unix (the `dist/cli.js` entry was being executed as a shell script).
+
 ## [0.1.1] - 2026-11-05
 
 ### Fixed

@@ -29,6 +29,12 @@ describe("tsconfig layers", () => {
   });
 });
 
+describe("bin shebang", () => {
+  it("dist/cli.js starts with a node shebang so global installs exec", () => {
+    expect(read("src/cli.ts").startsWith("#!/usr/bin/env node")).toBe(true);
+  });
+});
+
 describe("package contract", () => {
   const pkg = JSON.parse(read("package.json")) as Record<string, unknown> & {
     dependencies: Record<string, string>;
