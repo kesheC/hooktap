@@ -96,7 +96,47 @@ describe("replayCapture", () => {
     await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
     const port = (target.address() as { port: number }).port;
     const record = { method: "POST", url: "/", headers: {}, body: "", raw: "", receivedAt: "t", remote: "r" };
-    await expect(replayCapture(record, "http://127.0.0.1:" + port + "/x", 100)).rejects.toThrowError(/timed out/);
+    await expect(replayCapture(record, "http://127.0.0.1:" + port + "/x", 100)).rejects.toThrowError(/replay deadline exceeded \(100ms\)/);
+    target.closeAllConnections();
+    target.close();
+  });
+
+  it("rejects instead of hanging when the response socket dies mid-body", async () => {
+    // Regression: a target that answers 200 + content-length:100, writes a
+    // partial body and destroys the socket never fires "end" or a req error,
+    // so the old code left replayCapture pending forever (CLI never exited).
+    const target = createServer((_req, res) => {
+      res.writeHead(200, { "content-length": "100" });
+      res.write("partial");
+      setTimeout(() => res.destroy(), 30);
+    });
+    await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
+    const port = (target.address() as { port: number }).port;
+    const record = { method: "POST", url: "/", headers: {}, body: "hi", raw: "hi", receivedAt: "t", remote: "r" };
+    const started = Date.now();
+    await expect(replayCapture(record, "http://127.0.0.1:" + port + "/", 1000)).rejects.toThrowError(/response aborted before completion|socket hang up|ECONNRESET/i);
+    const elapsed = Date.now() - started;
+    expect(elapsed).toBeLessThan(1000);
+    target.closeAllConnections();
+    target.close();
+  });
+
+  it("settles exactly once when socket death and the deadline race", async () => {
+    // The deadline timer and mid-body socket death can both fire; settlement
+    // must be a single rejection, not a double reject crash.
+    const target = createServer((_req, res) => {
+      res.writeHead(200, { "content-length": "100" });
+      res.write("partial");
+      setTimeout(() => res.destroy(), 120);
+    });
+    await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
+    const port = (target.address() as { port: number }).port;
+    const record = { method: "POST", url: "/", headers: {}, body: "hi", raw: "hi", receivedAt: "t", remote: "r" };
+    const started = Date.now();
+    await expect(replayCapture(record, "http://127.0.0.1:" + port + "/", 100)).rejects.toThrowError(/replay deadline exceeded \(100ms\)/);
+    const elapsed = Date.now() - started;
+    expect(elapsed).toBeGreaterThanOrEqual(80);
+    expect(elapsed).toBeLessThan(2000);
     target.closeAllConnections();
     target.close();
   });
@@ -140,7 +180,7 @@ describe("replayCapture", () => {
     const port = (target.address() as { port: number }).port;
     const record = { method: "GET", url: "/", headers: {}, body: "", raw: "", receivedAt: "t", remote: "r" };
     const started = Date.now();
-    await expect(replayCapture(record, "http://127.0.0.1:" + port + "/", 200)).rejects.toThrowError(/timed out/);
+    await expect(replayCapture(record, "http://127.0.0.1:" + port + "/", 200)).rejects.toThrowError(/replay deadline exceeded \(200ms\)/);
     const elapsed = Date.now() - started;
     expect(elapsed).toBeGreaterThanOrEqual(150);
     expect(elapsed).toBeLessThan(2000);

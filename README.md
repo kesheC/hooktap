@@ -210,7 +210,7 @@ One fidelity limit: `raw` is stored as UTF-8 text, so byte-for-byte capture and 
 
 ```bash
 npm install
-npm test          # pretest builds first; offline, no network (test counts live in CHANGELOG Quality lines)
+npm test          # pretest builds first; offline, no network
 npm run coverage  # thresholds 80/70/85/80
 npm run dev -- --help
 npm run build
@@ -319,7 +319,7 @@ await capture.close();
 
 ```bash
 npm install
-npm test          # pretest 先构建；离线，不访问网络（测试数见 CHANGELOG Quality 行）
+npm test          # pretest 先构建；离线，不访问网络
 npm run coverage  # 阈值 80/70/85/80
 npm run dev -- --help
 npm run build

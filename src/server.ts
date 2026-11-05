@@ -96,6 +96,15 @@ export function createCaptureServer(opts: ServeOptions = {}): Promise<CaptureSer
   return new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {
+      // The once("error", reject) above only covers the listen phase; once
+      // listening succeeded, swap it for a persistent handler so later
+      // server-level errors surface on stderr and set exit code 2 (same
+      // contract as the cli.ts listen-error path) instead of vanishing.
+      server.removeListener("error", reject);
+      server.on("error", (err: Error) => {
+        process.stderr.write("hooktap: server error: " + (err instanceof Error ? err.message : String(err)) + "\n");
+        process.exitCode = 2;
+      });
       const address = server.address();
       const realPort = typeof address === "object" && address !== null ? address.port : port;
       const captureServer: CaptureServer = {
@@ -104,6 +113,9 @@ export function createCaptureServer(opts: ServeOptions = {}): Promise<CaptureSer
         captures: store.captures,
         close: () => new Promise<void>((res) => { server.close(() => res()); }),
       };
+      // Test seam: lets tests emit a synthetic server-level error to assert
+      // the persistent-handler wiring without a real post-listen failure.
+      (captureServer as CaptureServer & { __nodeServer?: Server }).__nodeServer = server;
       resolve(captureServer);
     });
   });

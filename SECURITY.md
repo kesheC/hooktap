@@ -30,8 +30,6 @@ This is a small project maintained on a best-effort basis. You should get an ack
 
 ## Scope
 
-Audit .env drift and secret leaks in your repository — zero dependencies.
-
 In scope:
 
 - Bypasses of the safety guarantees documented in the README.

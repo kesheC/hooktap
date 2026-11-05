@@ -98,4 +98,27 @@ describe("createCaptureServer", () => {
     expect(server.port).toBeGreaterThan(0);
     expect(server.url).toContain(":" + server.port);
   });
+
+  it("keeps a persistent error handler after listen so later server errors surface", async () => {
+    // Regression: server.once("error", reject) only covered the listen phase.
+    // Post-listen errors used to reject an already-resolved promise (silent
+    // no-op). They must now hit the persistent handler and set exit code 2.
+    const capture = await createCaptureServer({ quiet: true });
+    servers.push(capture);
+    const nodeServer = (capture as { __nodeServer?: import("node:http").Server }).__nodeServer;
+    expect(nodeServer).toBeDefined();
+    const before = process.exitCode;
+    const { stderr } = await import("node:process");
+    let wrote = "";
+    const orig = stderr.write.bind(stderr);
+    (stderr as unknown as { write: (c: string | Uint8Array) => boolean }).write = (c: string | Uint8Array) => { wrote += typeof c === "string" ? c : Buffer.from(c).toString("utf8"); return true; };
+    try {
+      nodeServer!.emit("error", new Error("synthetic post-listen failure"));
+    } finally {
+      (stderr as unknown as { write: (c: string | Uint8Array) => boolean }).write = orig;
+    }
+    expect(wrote).toContain("hooktap: server error: synthetic post-listen failure");
+    expect(process.exitCode).toBe(2);
+    process.exitCode = before;
+  });
 });

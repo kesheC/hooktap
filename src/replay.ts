@@ -57,10 +57,25 @@ export function replayCapture(record: CaptureRecord, targetUrl: string, timeoutM
   // body write below is skipped for GET/HEAD, so content-length goes too.
   if (!bodyless) headers["content-length"] = String(Buffer.byteLength(body, "utf8"));
   return new Promise<ReplayResult>((resolve, reject) => {
+    // Exactly-once settlement: a mid-body socket death fires several events
+    // (res error, aborted, req error) and the deadline timer fires on top of
+    // them, so every path funnels through this guard.
+    let settled = false;
+    const settle = (ok: boolean, value: ReplayResult | Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      if (ok) resolve(value as ReplayResult);
+      else reject(value as Error);
+    };
     // Absolute deadline, not the socket's idle timeout: a server that keeps
-    // dribbling bytes would reset req.setTimeout forever without this.
+    // dribbling bytes would reset req.setTimeout forever without this. The
+    // timer rejects directly (then destroys); it must not rely on destroy()
+    // producing an error event, which does not always happen.
     const deadline = setTimeout(() => {
-      req.destroy(new Error("replay timed out after " + timeoutMs + "ms"));
+      const err = new Error("replay deadline exceeded (" + timeoutMs + "ms)");
+      settle(false, err);
+      req.destroy(err);
     }, timeoutMs);
     const req = transport.request(
       { hostname: url.hostname, port: url.port, path: url.pathname + url.search, method: record.method, headers, agent: false },
@@ -68,13 +83,16 @@ export function replayCapture(record: CaptureRecord, targetUrl: string, timeoutM
         const chunks: Buffer[] = [];
         res.on("data", (c: Buffer) => chunks.push(c));
         res.on("end", () => {
-          clearTimeout(deadline);
-          resolve({ url: targetUrl, status: res.statusCode ?? 0, headers: cleanResponseHeaders(res), body: Buffer.concat(chunks).toString("utf8") });
+          settle(true, { url: targetUrl, status: res.statusCode ?? 0, headers: cleanResponseHeaders(res), body: Buffer.concat(chunks).toString("utf8") });
         });
+        // A response socket that dies mid-body never emits "end": reject so
+        // the caller's await settles instead of hanging forever.
+        res.on("error", (e: Error) => settle(false, e));
+        res.on("aborted", () => settle(false, new Error("response aborted before completion")));
       },
     );
-    req.setTimeout(timeoutMs, () => req.destroy(new Error("replay timed out after " + timeoutMs + "ms")));
-    req.on("error", (e) => { clearTimeout(deadline); reject(e); });
+    req.setTimeout(timeoutMs, () => settle(false, new Error("replay deadline exceeded (" + timeoutMs + "ms)")));
+    req.on("error", (e) => settle(false, e instanceof Error ? e : new Error(String(e))));
     if (!bodyless && body.length > 0) req.write(body);
     req.end();
   });

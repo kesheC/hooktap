@@ -179,6 +179,89 @@ describe("cli replay", () => {
   });
 });
 
+describe("cli end-of-options", () => {
+  it("treats everything after the first bare -- as a literal positional", () => {
+    // Regression: every bare "--" used to be stripped and positionals that
+    // start with "-" were skipped, so "--body-starts-with-dash" as BODY died
+    // with rc 2 "missing BODY".
+    const s = memStreams();
+    expect(main(["sign", "--secret", "k", "--", "--body-starts-with-dash"], s.stdout, s.stderr)).toBe(0);
+    expect(s.out.join("")).toMatch(/^sha256=[0-9a-f]{64}/);
+    const s2 = memStreams();
+    expect(main(["sign", "--secret", "k", "--", "--body-starts-with-dash", "extra"], s2.stdout, s2.stderr)).toBe(0);
+    expect(s2.out.join("")).toMatch(/^sha256=[0-9a-f]{64}/);
+  });
+
+  it("a leading bare -- terminates before any command token", () => {
+    const s = memStreams();
+    // Tokens after the first "--" are literal positionals, so a leading "--"
+    // leaves no command to run: usage error, not a crash or a hang.
+    expect(main(["--", "sign", "--secret", "k", "plain-body"], s.stdout, s.stderr)).toBe(2);
+    // Only the FIRST bare "--" is the terminator: a second one stays literal.
+    const s2 = memStreams();
+    expect(main(["sign", "--secret", "k", "--", "--", "--dash-dash"], s2.stdout, s2.stderr)).toBe(0);
+    expect(s2.out.join("")).toMatch(/^sha256=[0-9a-f]{64}/);
+  });
+});
+
+describe("cli replay failure paths", () => {
+  it("exits non-zero when the target socket dies mid-response", async () => {
+    // Regression for the replay hang: the CLI must print a clear error and
+    // exit 2 instead of never settling.
+    const target = createServer((_req, res) => {
+      res.writeHead(200, { "content-length": "100" });
+      res.write("partial");
+      setTimeout(() => res.destroy(), 30);
+    });
+    await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
+    const port = (target.address() as { port: number }).port;
+    const file = storeFixture([capture()]);
+    const s = memStreams();
+    const rc = main(["replay", file, "--to", "http://127.0.0.1:" + port + "/in"], s.stdout, s.stderr);
+    expect(rc).toBe(0);
+    // Wait until the async replay path has settled (error printed on stderr).
+    for (let i = 0; i < 100 && s.err.join("") === ""; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    expect(s.err.join("")).toContain("error:");
+    expect(s.err.join("")).not.toBe("");
+    target.closeAllConnections();
+    target.close();
+    await new Promise((r) => setTimeout(r, 50));
+  }, 15000);
+
+  it("exits non-zero in a child process when the replay target aborts mid-response", async () => {
+    // CLI-layer contract: process exit code must be 2 with a stderr message,
+    // not a silent hang (the audit's reproducible symptom).
+    const { spawn } = await import("node:child_process");
+    const { join, dirname } = await import("node:path");
+    const { mkdtempSync, writeFileSync: wfs, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const target = createServer((_req, res) => {
+      res.writeHead(200, { "content-length": "100" });
+      res.write("partial");
+      setTimeout(() => res.destroy(), 30);
+    });
+    await new Promise<void>((r) => target.listen(0, "127.0.0.1", r));
+    const port = (target.address() as { port: number }).port;
+    const dir = mkdtempSync(join(tmpdir(), "hooktap-replay-"));
+    const storePath = join(dir, "store.json");
+    wfs(storePath, JSON.stringify({ formatVersion: 1, name: "t", captures: [{ method: "POST", url: "/in", headers: {}, body: "hi", raw: "hi", receivedAt: "t", remote: "r" }] }));
+    const cliPath = join(dirname(dirname(new URL(import.meta.url).pathname.replace(/^\/(\w:)/, "$1"))), "dist", "cli.js");
+    const child = spawn(process.execPath, [cliPath, "replay", storePath, "--to", "http://127.0.0.1:" + port + "/in"], { stdio: ["ignore", "pipe", "pipe"] });
+    let stderrOut = "";
+    let stdoutOut = "";
+    child.stderr!.on("data", (c: Buffer) => { stderrOut += c.toString("utf8"); });
+    child.stdout!.on("data", (c: Buffer) => { stdoutOut += c.toString("utf8"); });
+    const rc = await new Promise<number>((resolve) => child.on("close", (code) => resolve(code ?? -1)));
+    expect(rc).toBe(2);
+    expect(stderrOut).toContain("error:");
+    rmSync(dir, { recursive: true, force: true });
+    target.closeAllConnections();
+    target.close();
+  }, 15000);
+});
+
 describe("cli listen", () => {
   it("validates --port", () => {
     const s = memStreams();

@@ -30,8 +30,12 @@ describe("tsconfig layers", () => {
 });
 
 describe("bin shebang", () => {
-  it("dist/cli.js starts with a node shebang so global installs exec", () => {
+  it("src/cli.ts and dist/cli.js start with a node shebang so global installs exec", () => {
+    // src/cli.ts carries the shebang; dist/cli.js is what npm actually runs,
+    // so the built bin must carry it too. dist exists whenever pretest=build
+    // has run (i.e. before every npm test / npm run coverage).
     expect(read("src/cli.ts").startsWith("#!/usr/bin/env node")).toBe(true);
+    expect(read("dist/cli.js").startsWith("#!/usr/bin/env node")).toBe(true);
   });
 });
 

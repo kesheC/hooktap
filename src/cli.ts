@@ -45,23 +45,30 @@ function hasFlag(args: string[], flag: string): boolean {
 
 const VALUE_FLAGS = new Set(["--port", "--host", "--out", "--secret", "--scheme", "--to", "--index", "--last"]);
 
-function positional(args: string[]): string | undefined {
+function positional(args: string[], trailing: string[] = []): string | undefined {
   for (let i = 0; i < args.length; i++) {
     const a: string | undefined = args[i];
     const prev: string | undefined = args[i - 1];
     if (a !== undefined && !a.startsWith("-") && !VALUE_FLAGS.has(prev ?? "")) return a;
   }
-  return undefined;
+  // Tokens after the first bare "--" are positionals verbatim, even when they
+  // start with "-" (end-of-options convention).
+  return trailing[0];
 }
 
 /** CLI entry. Returns a process exit code. */
 export function main(argv: string[], stdout: NodeJS.WritableStream = process.stdout, stderr: NodeJS.WritableStream = process.stderr): number {
-  const args = argv.filter((a) => a !== "--");
-  if (hasFlag(args, "-h") || hasFlag(args, "--help")) { stdout.write(HELP); return 0; }
-  if (hasFlag(args, "-V") || hasFlag(args, "--version")) { stdout.write("hooktap " + VERSION + "\n"); return 0; }
+  // POSIX end-of-options: only the FIRST bare "--" is the terminator; every
+  // token after it is a literal positional (so a body or file named "-x" or
+  // "--flag-like" is deliverable). Parsing before the terminator is unchanged.
+  const sep = argv.indexOf("--");
+  const pre = sep === -1 ? argv : argv.slice(0, sep);
+  const trailing: string[] = sep === -1 ? [] : argv.slice(sep + 1);
+  if (hasFlag(pre, "-h") || hasFlag(pre, "--help")) { stdout.write(HELP); return 0; }
+  if (hasFlag(pre, "-V") || hasFlag(pre, "--version")) { stdout.write("hooktap " + VERSION + "\n"); return 0; }
 
-  const cmd = args[0];
-  const rest = args.slice(1);
+  const cmd = pre[0];
+  const rest = pre.slice(1);
 
   const fail = (msg: string): number => { stderr.write("error: " + msg + "\n"); return 2; };
 
@@ -89,7 +96,7 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
     if (cmd === "verify") {
       const secret = argValue(rest, "--secret");
       if (!secret) return fail("--secret is required");
-      const file = positional(rest);
+      const file = positional(rest, trailing);
       if (!file) return fail("missing FILE argument (see --help)");
       // loadCaptures is the single entry point for reading stores: it carries
       // the formatVersion and shape checks, so verify must not bypass it.
@@ -113,7 +120,7 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
       if (!secret) return fail("--secret is required");
       const schemeRaw = argValue(rest, "--scheme") ?? "sha256";
       if (schemeRaw !== "sha256" && schemeRaw !== "sha1") return fail("--scheme must be sha256 or sha1");
-      const bodyArg = positional(rest);
+      const bodyArg = positional(rest, trailing);
       if (bodyArg === undefined) return fail("missing BODY argument (pass the payload as one argument; compose with \$(echo ... ) in the shell)");
       stdout.write(signBody(secret, bodyArg, schemeRaw) + "\n");
       return 0;
@@ -122,7 +129,7 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
     if (cmd === "replay") {
       const to = argValue(rest, "--to");
       if (!to) return fail("--to URL is required");
-      const file = positional(rest);
+      const file = positional(rest, trailing);
       if (!file) return fail("missing FILE argument (see --help)");
       const store = loadCaptures(file);
       const index = Number(argValue(rest, "--index") ?? "0");
@@ -141,7 +148,7 @@ export function main(argv: string[], stdout: NodeJS.WritableStream = process.std
     }
 
     if (cmd === "inspect") {
-      const file = positional(rest);
+      const file = positional(rest, trailing);
       if (!file) return fail("missing FILE argument (see --help)");
       const store = loadCaptures(file);
       if (hasFlag(rest, "--json")) { stdout.write(JSON.stringify(store, null, 2) + "\n"); return 0; }

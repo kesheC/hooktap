@@ -40,7 +40,8 @@ updates:
     # coverage-v8 move alone and dependabot opened exactly that pull request
     # the day after coverage-v8 joined the tree -- all six CI legs died on
     # ERESOLVE, on a pull request that could never have worked. tests/
-    # workflow.test.ts now fails if a pinned pair is not ignored together.
+    # guards.test.ts asserts that vitest, @vitest/coverage-v8 and @types/node
+    # all stay listed in this ignore block.
     #
     # The pair lifts when vitest 5's engines floor drops to what this package
     # still promises, or when the floor here rises to ^22.12; whichever comes

@@ -2,3 +2,5 @@ coverage/
 dist/
 node_modules/
 release/
+demo/listen.log
+demo/store.json
