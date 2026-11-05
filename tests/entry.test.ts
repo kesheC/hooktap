@@ -28,7 +28,7 @@ describe("cli entry guard", () => {
   it("--version prints without needing an exit syscall", async () => {
     const r = await runCli(["--version"]);
     expect(r.status).toBe(0);
-    expect(r.stdout).toContain("hooktap 0.1.2");
+    expect(r.stdout).toContain("hooktap 0.1.3");
   });
 
   it("replay completes asynchronously and prints status before exit", async () => {

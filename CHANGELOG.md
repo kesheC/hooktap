@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- nothing yet
+
+## [0.1.3] - 2026-11-05
+
 ### Fixed
 
 - `verify` treats a stored `raw` of `null` as "payload not stored" and falls back to the decoded body, matching replay semantics (it used to hash the string `"null"`).

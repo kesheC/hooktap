@@ -9,7 +9,7 @@ import { replayCapture } from "./replay.js";
 import { installPipeGuard } from "./pipe.js";
 import type { CaptureRecord } from "./types.js";
 
-export const VERSION = "0.1.2";
+export const VERSION = "0.1.3";
 
 const HELP = `hooktap ${VERSION} - capture, verify and replay webhooks locally
 
